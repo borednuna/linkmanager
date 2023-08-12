@@ -1,10 +1,10 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const PORT = 3000;
 
 // load configs
 require('dotenv').config();
-const { FIREBASE_PROJECT_ID, FIREBASE_KEY, PORT } = process.env;
 
 app.use(cors());
 app.use(express.json());
@@ -14,10 +14,10 @@ app.get('/', (req, res) => res.send('Server repository for manual linktree'));
 
 // Configure SDK
 const admin = require('firebase-admin');
-const serviceAccount = require('./' + FIREBASE_PROJECT_ID + '-' + FIREBASE_KEY +'.json');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://' + FIREBASE_PROJECT_ID + '.firebaseio.com' // Replace with your Firebase project URL
+  databaseURL: 'https://asramaputra-f1910.firebaseio.com' // Replace with your Firebase project URL
 });
 
 const db = admin.firestore();
