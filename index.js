@@ -13,72 +13,94 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (req, res) => res.send('Server repository for manual linktree'));
 
 // Configure SDK
-const admin = require('firebase-admin');
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://asramaputra-f1910.firebaseio.com' // Replace with your Firebase project URL
-});
+const { initializeApp } = require('firebase/app');
+const { getDatabase, ref, set, get, push, remove } = require("firebase/database");
 
-const db = admin.firestore();
+// TODO: Replace the following with your app's Firebase project configuration
+// See: https://firebase.google.com/docs/web/learn-more#config-object
+const firebaseConfig = {
+  // ...
+  // The value of `databaseURL` depends on the location of the database
+  databaseURL: process.env.FIREBASE_URI,
+};
 
-// Endpoint to read all data
-async function getAllLinks(collection) {
-    try {
-        const snapshot = await db.collection(collection).get();
-        const data = snapshot.docs.map(doc => {
-            return {
-                id: doc.id,
-                data: doc.data()
-            };
-        });
-        return data;
-    } catch (error) {
-        console.log(error);
-        return error;
-    }
+// Initialize Firebase
+const firebaseApp = initializeApp(firebaseConfig);
+
+// Initialize Realtime Database and get a reference to the service
+const database = getDatabase(firebaseApp);
+
+// Write data
+async function writeDataAP(link, string) {
+  try {
+    const parentRef = ref(database, 'asramaputra/'); // Replace with your parent node
+    const newChildRef = push(parentRef); // Generates a new unique key
+
+    const newData = {
+      link: link,
+      string: string,
+    };
+    
+    await set(newChildRef, newData);
+    console.log('New data added successfully with unique key:', newChildRef.key);
+  } catch (error) {
+    console.error('Error writing data:', error);
+  }
 }
 
-app.get('/getAll/:collection', async (req, res) => {
-    const collection = req.params.collection;
-    const data = await getAllLinks(collection);
-    res.send(data);
+app.post('/addAP', async (req, res) => {
+    const { link, string } = req.body;
+    try {
+        await writeDataAP(link, string);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'An error occurred while writing data.' });
+    }
 });
 
-// Endpoint to add new link
-async function addLink(collection, link, string) {
-    try {
-        await db.collection(collection).doc().set({
-            link,
-            string
-        });
-        console.log('Document added successfully.');
-    } catch (error) {
-        console.log(error);
-    }
+// Read data
+async function readDataAP() {
+  try {
+    const linkRef = ref(database, 'asramaputra/');
+    const linkSnapshot = await get(linkRef);
+    const link = linkSnapshot.val();
+    return link;
+  } catch (error) {
+    console.error('Error reading data:', error);
+  }
 }
 
-app.post('/addLink', async (req, res) => {
-    const { collection, link, string } = req.body;
-    await addLink(collection, link, string);
-    res.send('Link added successfully.');
-});
-
-// Endpoint to delete link
-async function deleteLink(collection, documentId) {
+app.get('/fetchAP', async (req, res) => {
     try {
-        await db.collection(collection).doc(documentId).delete();
-        console.log('Document deleted successfully.');
+      const linkData = await readDataAP();
+      res.json(linkData);
     } catch (error) {
-        console.log(error);
+      res.status(500).json({ error: 'An error occurred while reading data.' });
     }
-}
+  });
 
-app.delete('/deleteLink/:collection/:documentId', async (req, res) => {
-    const collection = req.params.collection;
-    const documentId = req.params.documentId;
-    await deleteLink(collection, documentId);
-    res.send('Link deleted successfully.');
+// Delete data
+async function deleteData(linkId) {
+    try {
+      const dataRef = ref(database, 'asramaputra/' + linkId); // Replace with the path to the data you want to delete
+
+      await remove(dataRef);
+      console.log('Data deleted successfully.');
+    } catch (error) {
+      console.error('Error deleting data:', error);
+    }
+  }
+
+app.delete('/deleteAP/:linkId', async (req, res) => {
+    const { linkId } = req.params;
+    try {
+        await deleteData(linkId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'An error occurred while deleting data.' });
+    }
 });
 
-app.listen(PORT, () => console.log(`Example app listening on port ${PORT}!`));
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
